@@ -1,257 +1,348 @@
-# Microservicio de Gestión de Notificaciones (Notification Management)
+# Microservicio de Gestión de Calificaciones (Grade Management)
 
 ## Detalle del Microservicio
-Este microservicio se encarga de la gestión de notificaciones del sistema educativo, permitiendo crear, consultar, actualizar y eliminar notificaciones para estudiantes, profesores y padres. Está diseñado siguiendo una arquitectura hexagonal y utiliza programación reactiva con Spring WebFlux y MongoDB como base de datos.
+Este microservicio se encarga de la gestión de calificaciones de estudiantes, permitiendo registrar, consultar, actualizar y eliminar calificaciones. Está diseñado siguiendo una arquitectura hexagonal y utiliza programación reactiva con Spring WebFlux y MongoDB como base de datos.
+
+**Característica especial**: El microservicio incluye funcionalidad transaccional que genera notificaciones automáticas cuando se crean o actualizan calificaciones.
 
 ## Estructura del Proyecto
 ```
 src/main/java/pe/edu/vallegrande/vg_ms_grade_management/
 ├── domain/
 │   ├── model/
-│   │   └── Notification.java              // Entidad que representa una notificación
-│   └── enums/
-│       └── ... (otros enums del dominio)
+│   │   └── Grade.java                 // Entidad que representa una nota
+│   │   └── DatabaseSequence.java      // Entidad para la secuencia de IDs
+│   ├── enums/
+│   │   └── ... (otros enums del dominio)
+│   └── repository/
+│       └── GradeRepository.java       // Interfaz para la persistencia de notas
 ├── application/
 │   ├── service/
-│   │   └── NotificationService.java       // Interfaz para los servicios de notificaciones
+│   │   ├── GradeService.java          // Interfaz para los servicios de notas
+│   │   ├── GradeNotificationService.java // Servicio para notificaciones transaccionales
+│   │   └── SequenceGeneratorService.java // Servicio para generar secuencias de IDs
 │   └── impl/
-│       └── NotificationServiceImpl.java   // Implementación de los servicios de notificaciones
+│       ├── GradeServiceImpl.java    // Implementación de los servicios de notas
+│       └── GradeNotificationServiceImpl.java // Implementación de notificaciones transaccionales
 ├── infrastructure/
 │   ├── config/
 │   │   └── ... (configuraciones específicas de infraestructura)
 │   ├── document/
-│   │   └── NotificationDocument.java      // Documento MongoDB para notificaciones
+│   │   └── GradeDocument.java         // Documento MongoDB para notas
 │   ├── dto/
 │   │   ├── request/
-│   │   │   └── NotificationRequest.java   // DTO para la creación/actualización de notificaciones
+│   │   │   └── GradeRequest.java    // DTO para la creación/actualización de notas
 │   │   └── response/
-│   │       └── NotificationResponse.java  // DTO para las respuestas de notificaciones
+│   │       └── GradeResponse.java   // DTO para las respuestas de notas
 │   ├── mapper/
-│   │   └── NotificationMapper.java        // Mapper entre Notification y NotificationDocument
+│   │   └── GradeMapper.java           // Mapper entre Grade y GradeDocument
 │   ├── repository/
-│   │   └── NotificationRepository.java    // Repositorio Spring Data MongoDB para notificaciones
-│   └── rest/
-│       └── NotificationRest.java          // Controlador REST para las notificaciones
-└── VgMsGradeManagementApplication.java    // Clase principal de la aplicación
+│   │   └── GradeRepository.java       // Repositorio Spring Data MongoDB para notas
+│   ├── rest/
+│   │   └── GradeRest.java             // Controlador REST para las notas
+│   └── service/
+│       └── ApiService.java            // Servicio de API genérico
+└── VgMsGradeManagementApplication.java  // Clase principal de la aplicación
 ```
+
+## Funcionalidad Transaccional de Notificaciones
+
+### Comportamiento Automático
+Cuando se crea o actualiza una calificación, el sistema automáticamente genera notificaciones:
+
+1. **Al crear una calificación** (`POST /api/grades`):
+   - Genera notificación tipo `GRADE_PUBLISHED` para el estudiante
+   - Si la calificación es menor a 11, genera notificación `LOW_PERFORMANCE` para los padres
+
+2. **Al actualizar una calificación** (`PUT /api/grades/{id}`):
+   - Genera notificación tipo `GRADE_UPDATED` para el estudiante
+   - Si la calificación es menor a 11, genera notificación `LOW_PERFORMANCE` para los padres
+
+### Tipos de Notificaciones Generadas
+- **GRADE_PUBLISHED**: Cuando se publica una nueva calificación
+- **GRADE_UPDATED**: Cuando se actualiza una calificación existente
+- **LOW_PERFORMANCE**: Cuando la calificación es menor a 11 puntos (para padres)
 
 ## Documentación de API
 
-### Endpoints de Notificaciones (`/notifications`)
+### Endpoints de Calificaciones (`/api/grades`)
 
-| Método | Path                | Descripción                                   | JSON de Request (Ejemplo) | JSON de Response (Ejemplo) |
-|--------|---------------------|-----------------------------------------------|---------------------------|----------------------------|
-| GET    | `/`                 | Obtiene todas las notificaciones              | N/A                       | `[ { "id": "1", "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido publicada", "notificationType": "GRADE_PUBLISHED", "status": "PENDING", "channel": "EMAIL", "createdAt": "2024-01-15T10:30:00", "sentAt": null } ]` |
-| GET    | `/{id}`             | Obtiene una notificación por su ID            | N/A                       | `{ "id": "1", "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido publicada", "notificationType": "GRADE_PUBLISHED", "status": "SENT", "channel": "EMAIL", "createdAt": "2024-01-15T10:30:00", "sentAt": "2024-01-15T10:35:00" }` |
-| POST   | `/`                 | Crea una nueva notificación                   | `{ "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido publicada", "notificationType": "GRADE_PUBLISHED", "status": "PENDING", "channel": "EMAIL" }` | `{ "id": "2", "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido publicada", "notificationType": "GRADE_PUBLISHED", "status": "PENDING", "channel": "EMAIL", "createdAt": "2024-01-15T11:00:00", "sentAt": null }` |
-| PUT    | `/{id}`             | Actualiza una notificación existente          | `{ "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido actualizada", "notificationType": "GRADE_UPDATED", "status": "SENT", "channel": "SMS" }` | `{ "id": "1", "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido actualizada", "notificationType": "GRADE_UPDATED", "status": "SENT", "channel": "SMS", "createdAt": "2024-01-15T10:30:00", "sentAt": "2024-01-15T11:00:00" }` |
-| DELETE | `/{id}`             | Elimina una notificación                      | N/A                       | `204 No Content` |
-
-## Tipos de Datos
-
-### RecipientType (Tipo de Destinatario)
-- `STUDENT` - Estudiante
-- `TEACHER` - Profesor
-- `PARENT` - Padre/Madre
-
-### NotificationType (Tipo de Notificación)
-- `GRADE_PUBLISHED` - Calificación Publicada
-- `GRADE_UPDATED` - Calificación Actualizada
-- `LOW_PERFORMANCE` - Bajo Rendimiento
-
-### Status (Estado)
-- `PENDING` - Pendiente
-- `SENT` - Enviada
-- `FAILED` - Fallida
-
-### Channel (Canal)
-- `EMAIL` - Correo Electrónico
-- `SMS` - Mensaje de Texto
-- `PUSH` - Notificación Push
+| Método | Path                                      | Descripción                                   | JSON de Request (Ejemplo) | JSON de Response (Ejemplo) |
+|--------|-------------------------------------------|-----------------------------------------------|---------------------------|----------------------------|
+| GET    | `/`                                       | Obtiene todas las calificaciones              | N/A                       | `[ { "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false } ]` |
+| GET    | `/{id}`                                   | Obtiene una calificación por su ID            | N/A                       | `{ "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false }` |
+| GET    | `/student/{studentId}`                    | Obtiene calificaciones por ID de estudiante   | N/A                       | `[ { "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false } ]` |
+| GET    | `/course/{courseId}`                      | Obtiene calificaciones por ID de curso        | N/A                       | `[ { "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false } ]` |
+| GET    | `/student/{studentId}/course/{courseId}`  | Obtiene calificaciones por ID de estudiante y curso | N/A                       | `{ "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false }` |
+| **GET** | **`/{id}/notifications`**                 | **Obtiene notificaciones relacionadas con una calificación** | N/A | `[ { "id": "1", "recipientId": "S001", "recipientType": "STUDENT", "message": "Tu calificación ha sido publicada", "notificationType": "GRADE_PUBLISHED", "status": "PENDING", "channel": "EMAIL" } ]` |
+| POST   | `/`                                       | Crea una nueva calificación                   | `{ "studentId": "S001", "courseId": "C001", "grade": 90.0 }` | `{ "id": "2", "studentId": "S001", "courseId": "C001", "grade": 90.0, "deleted": false }` |
+| PUT    | `/{id}`                                   | Actualiza una calificación existente          | `{ "studentId": "S001", "courseId": "C001", "grade": 92.0 }` | `{ "id": "1", "studentId": "S001", "courseId": "C001", "grade": 92.0, "deleted": false }` |
+| DELETE | `/{id}`                                   | Elimina lógicamente una calificación          | N/A                       | `{ "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": true }` |
+| PUT    | `/{id}/restore`                           | Restaura una calificación eliminada lógicamente | N/A                       | `{ "id": "1", "studentId": "S001", "courseId": "C001", "grade": 85.5, "deleted": false }` |
+| GET    | `/inactive`                               | Obtiene todas las calificaciones inactivas (eliminadas lógicamente) | N/A                       | `[ { "id": "3", "studentId": "S002", "courseId": "C002", "grade": 70.0, "deleted": true } ]` |
 
 ## Ejemplos de JSON para Endpoints
 
-### NotificationRequest (POST /notifications, PUT /notifications/{id})
+### GradeRequest (POST /api/grades, PUT /api/grades/{id})
 ```json
 {
-  "recipientId": "S001",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Matemáticas ha sido publicada. Obtuviste 18/20 puntos.",
-  "notificationType": "GRADE_PUBLISHED",
-  "status": "PENDING",
-  "channel": "EMAIL"
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 90.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo en el examen"
 }
 ```
 
-### NotificationResponse (GET /notifications, GET /notifications/{id}, etc.)
+### GradeResponse (GET /api/grades, GET /api/grades/{id}, etc.)
 ```json
 {
-  "id": "65d2a7f1b3e9c8a7b6c5d4e3",
-  "recipientId": "S001",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Matemáticas ha sido publicada. Obtuviste 18/20 puntos.",
-  "notificationType": "GRADE_PUBLISHED",
-  "status": "SENT",
-  "channel": "EMAIL",
-  "createdAt": "2024-01-15T10:30:00",
-  "sentAt": "2024-01-15T10:35:00"
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 90.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo en el examen",
+  "deleted": false
 }
 ```
 
-### Ejemplo de Respuesta para GET /notifications (Lista de Notificaciones)
+### Ejemplo de Respuesta para GET /api/grades/{id}/notifications (Notificaciones de Calificación)
 ```json
 [
   {
     "id": "65d2a7f1b3e9c8a7b6c5d4e3",
     "recipientId": "S001",
     "recipientType": "STUDENT",
-    "message": "Tu calificación de Matemáticas ha sido publicada. Obtuviste 18/20 puntos.",
-    "notificationType": "GRADE_PUBLISHED",
-    "status": "SENT",
-    "channel": "EMAIL",
-    "createdAt": "2024-01-15T10:30:00",
-    "sentAt": "2024-01-15T10:35:00"
-  },
-  {
-    "id": "65d2a7f1b3e9c8a7b6c5d4e4",
-    "recipientId": "T001",
-    "recipientType": "TEACHER",
-    "message": "Nueva calificación pendiente de revisión para el curso de Física.",
+    "message": "Tu calificación de Curso C001 ha sido publicada. Obtuviste 90.0/20 puntos.",
     "notificationType": "GRADE_PUBLISHED",
     "status": "PENDING",
-    "channel": "PUSH",
-    "createdAt": "2024-01-15T11:00:00",
+    "channel": "EMAIL",
+    "createdAt": "2024-01-15T10:30:00",
     "sentAt": null
   },
   {
-    "id": "65d2a7f1b3e9c8a7b6c5d4e5",
-    "recipientId": "P001",
+    "id": "65d2a7f1b3e9c8a7b6c5d4e4",
+    "recipientId": "PS001",
     "recipientType": "PARENT",
-    "message": "Su hijo/a ha obtenido una calificación baja en Historia. Por favor revise el progreso académico.",
+    "message": "Su hijo/a ha obtenido una calificación baja (8.5/20) en Curso C001. Por favor revise el progreso académico.",
     "notificationType": "LOW_PERFORMANCE",
-    "status": "SENT",
+    "status": "PENDING",
     "channel": "SMS",
-    "createdAt": "2024-01-15T09:15:00",
-    "sentAt": "2024-01-15T09:20:00"
+    "createdAt": "2024-01-15T10:30:00",
+    "sentAt": null
   }
 ]
 ```
 
-### Ejemplo de Respuesta para GET /notifications/{id} (Notificación Única)
+### Ejemplo de Respuesta para GET /api/grades (Lista de Calificaciones)
+```json
+[
+  {
+    "id": "654321",
+    "studentId": "S001",
+    "courseId": "C001",
+    "grade": 90.0,
+    "academicPeriod": "Bimester",
+    "evaluationType": "Exam",
+    "evaluationDate": "2024-01-15",
+    "remarks": "Excelente trabajo en el examen",
+    "deleted": false
+  },
+  {
+    "id": "654322",
+    "studentId": "S002",
+    "courseId": "C002",
+    "grade": 85.5,
+    "academicPeriod": "Bimester",
+    "evaluationType": "Project",
+    "evaluationDate": "2024-01-16",
+    "remarks": "Buen trabajo en el proyecto",
+    "deleted": false
+  }
+]
+```
+
+### Ejemplo de Respuesta para GET /api/grades/{id} (Calificación Única)
 ```json
 {
-  "id": "65d2a7f1b3e9c8a7b6c5d4e3",
-  "recipientId": "S001",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Matemáticas ha sido publicada. Obtuviste 18/20 puntos.",
-  "notificationType": "GRADE_PUBLISHED",
-  "status": "SENT",
-  "channel": "EMAIL",
-  "createdAt": "2024-01-15T10:30:00",
-  "sentAt": "2024-01-15T10:35:00"
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 90.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo en el examen",
+  "deleted": false
 }
 ```
 
-### Ejemplo de Respuesta para POST /notifications (Creación)
+### Ejemplo de Respuesta para DELETE /api/grades/{id} (Eliminación Lógica)
 ```json
 {
-  "id": "65d2a7f1b3e9c8a7b6c5d4e6",
-  "recipientId": "S002",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Ciencias ha sido actualizada. Nueva calificación: 16/20 puntos.",
-  "notificationType": "GRADE_UPDATED",
-  "status": "PENDING",
-  "channel": "EMAIL",
-  "createdAt": "2024-01-15T12:00:00",
-  "sentAt": null
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 90.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo en el examen",
+  "deleted": true
 }
 ```
 
-### Ejemplo de Respuesta para PUT /notifications/{id} (Actualización)
+### Ejemplo de Respuesta para PUT /api/grades/{id}/restore (Restauración)
 ```json
 {
-  "id": "65d2a7f1b3e9c8a7b6c5d4e6",
-  "recipientId": "S002",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Ciencias ha sido actualizada. Nueva calificación: 16/20 puntos.",
-  "notificationType": "GRADE_UPDATED",
-  "status": "SENT",
-  "channel": "SMS",
-  "createdAt": "2024-01-15T12:00:00",
-  "sentAt": "2024-01-15T12:05:00"
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 90.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo en el examen",
+  "deleted": false
 }
 ```
 
-### Ejemplo de Respuesta para DELETE /notifications/{id} (Eliminación)
-```http
-HTTP/1.1 204 No Content
-```
+## Casos de Uso con Notificaciones Automáticas
 
-## Casos de Uso Comunes
+### 1. Crear Calificación con Notificación Automática
+**POST** `/api/grades`
 
-### 1. Notificación de Calificación Publicada
 ```json
 {
-  "recipientId": "S001",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Matemáticas ha sido publicada. Obtuviste 18/20 puntos.",
-  "notificationType": "GRADE_PUBLISHED",
-  "status": "PENDING",
-  "channel": "EMAIL"
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 18.5,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Excelente trabajo"
 }
 ```
 
-### 2. Notificación de Bajo Rendimiento para Padres
+**Resultado**: Se crea la calificación y automáticamente se genera una notificación `GRADE_PUBLISHED` para el estudiante.
+
+### 2. Crear Calificación con Bajo Rendimiento
+**POST** `/api/grades`
+
 ```json
 {
-  "recipientId": "P001",
-  "recipientType": "PARENT",
-  "message": "Su hijo/a ha obtenido una calificación baja en Historia. Por favor revise el progreso académico.",
-  "notificationType": "LOW_PERFORMANCE",
-  "status": "PENDING",
-  "channel": "SMS"
+  "studentId": "S002",
+  "courseId": "C001",
+  "grade": 8.5,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Necesita mejorar"
 }
 ```
 
-### 3. Notificación de Calificación Actualizada
+**Resultado**: Se crea la calificación y automáticamente se generan:
+- Notificación `GRADE_PUBLISHED` para el estudiante
+- Notificación `LOW_PERFORMANCE` para los padres
+
+### 3. Actualizar Calificación
+**PUT** `/api/grades/654321`
+
 ```json
 {
-  "recipientId": "S002",
-  "recipientType": "STUDENT",
-  "message": "Tu calificación de Ciencias ha sido actualizada. Nueva calificación: 16/20 puntos.",
-  "notificationType": "GRADE_UPDATED",
-  "status": "PENDING",
-  "channel": "PUSH"
+  "studentId": "S001",
+  "courseId": "C001",
+  "grade": 19.0,
+  "academicPeriod": "Bimester",
+  "evaluationType": "Exam",
+  "evaluationDate": "2024-01-15",
+  "remarks": "Calificación corregida"
 }
 ```
 
-### 4. Notificación para Profesores
+**Resultado**: Se actualiza la calificación y automáticamente se genera una notificación `GRADE_UPDATED` para el estudiante.
+
+### 4. Consultar Notificaciones de una Calificación
+**GET** `/api/grades/654321/notifications`
+
+**Resultado**: Retorna todas las notificaciones relacionadas con esa calificación específica.
+
+### 5. Obtener Notas Inactivas
+
+**GET** `/api/v1/grades/inactive`
+
+```json
+[
+  {
+    "id": "65d2a7f1b3e9c8a7b6c5d4e3",
+    "studentId": "S001",
+    "courseId": "C001",
+    "grade": 12.5,
+    "deleted": true
+  },
+  {
+    "id": "65d2a7f1b3e9c8a7b6c5d4e4",
+    "studentId": "S002",
+    "courseId": "C002",
+    "grade": 18.0,
+    "deleted": true
+  }
+]
+```
+
+### 6. Reporte de Promedio de Notas por Estudiante
+
+**GET** `/api/v1/reports/student/{studentId}/average-grade`
+
 ```json
 {
-  "recipientId": "T001",
-  "recipientType": "TEACHER",
-  "message": "Nueva calificación pendiente de revisión para el curso de Física.",
-  "notificationType": "GRADE_PUBLISHED",
-  "status": "PENDING",
-  "channel": "PUSH"
+  "studentId": "S001",
+  "averageGrade": 15.5,
+  "message": "This is a placeholder for student average grade report."
 }
 ```
 
-## Códigos de Estado HTTP
+### 7. Reporte de Distribución de Notas por Curso
 
-- `200 OK` - Operación exitosa
-- `201 Created` - Recurso creado exitosamente
-- `204 No Content` - Operación exitosa sin contenido de respuesta
-- `400 Bad Request` - Solicitud malformada
-- `404 Not Found` - Recurso no encontrado
-- `500 Internal Server Error` - Error interno del servidor
+**GET** `/api/v1/reports/course/{courseId}/grade-distribution`
+
+```json
+{
+  "courseId": "C001",
+  "gradeDistribution": {
+    "0-10": 10,
+    "11-15": 25,
+    "16-20": 15
+  },
+  "message": "This is a placeholder for course grade distribution report."
+}
+```
+
+## Flujo Transaccional
+
+### Al Crear una Calificación:
+1. Se valida la calificación
+2. Se guarda en la base de datos
+3. Se genera notificación `GRADE_PUBLISHED` para el estudiante
+4. Si la calificación < 11, se genera notificación `LOW_PERFORMANCE` para los padres
+5. Se retorna la calificación creada
+
+### Al Actualizar una Calificación:
+1. Se valida la calificación
+2. Se actualiza en la base de datos
+3. Se genera notificación `GRADE_UPDATED` para el estudiante
+4. Si la calificación < 11, se genera notificación `LOW_PERFORMANCE` para los padres
+5. Se retorna la calificación actualizada
 
 ## Notas Técnicas
 
-- El microservicio utiliza **Spring WebFlux** para programación reactiva
-- **MongoDB** como base de datos NoSQL
-- **MapStruct** para mapeo entre entidades y documentos
-- **Lombok** para reducir código boilerplate
-- Las fechas se manejan en formato **ISO 8601** (LocalDateTime)
-- El campo `createdAt` se establece automáticamente al crear una notificación
-- El campo `sentAt` se actualiza cuando la notificación es enviada exitosamente 
+- **Transaccionalidad**: Las operaciones de calificaciones y notificaciones son transaccionales
+- **Reactividad**: Todo el flujo utiliza programación reactiva con Project Reactor
+- **Automatización**: Las notificaciones se generan automáticamente sin intervención manual
+- **Flexibilidad**: Los mensajes se generan dinámicamente basados en los datos de la calificación
+- **Canalización**: Diferentes tipos de notificaciones usan diferentes canales (EMAIL, SMS)
