@@ -52,10 +52,45 @@ src/main/java/pe/edu/vallegrande/vg_ms_grade_management/
 
 | Método | Path                                      | Descripción                                                                 | JSON de Request (Ejemplo) | JSON de Response (Ejemplo) |
 |--------|-------------------------------------------|-----------------------------------------------------------------------------|---------------------------|----------------------------|
+| GET    | `/`                                       | Obtiene todos los reportes disponibles.                                     | N/A                       | `[ { "message": "This is a placeholder for all reports." } ]` |
+| GET    | `/{reportId}`                             | Obtiene un reporte específico por su ID.                                    | N/A                       | `{ "reportId": "R001", "message": "This is a placeholder for a specific report by ID." }` |
+| GET    | `/student/{studentId}`                    | Obtiene reportes filtrados por ID de estudiante.                            | N/A                       | `[ { "studentId": "S001", "message": "This is a placeholder for reports filtered by student ID." } ]` |
+| GET    | `/course/{courseId}`                      | Obtiene reportes filtrados por ID de curso.                                 | N/A                       | `[ { "courseId": "C001", "message": "This is a placeholder for reports filtered by course ID." } ]` |
 | GET    | `/student/{studentId}/average-grade`      | Obtiene el promedio de calificaciones de un estudiante específico.          | N/A                       | `{ "studentId": 1, "averageGrade": 15.5 }` |
 | GET    | `/course/{courseId}/grade-distribution`   | Obtiene la distribución de calificaciones para un curso específico.         | N/A                       | `{ "courseId": 101, "distribution": { "0-5": 2, "6-10": 5, "11-15": 10, "16-20": 8 } }` |
 
 ## Ejemplos de JSON para Endpoints
+
+### Ejemplo de Respuesta para GET /api/v1/reports (Todos los reportes)
+```json
+{
+  "message": "This is a placeholder for all reports."
+}
+```
+
+### Ejemplo de Respuesta para GET /api/v1/reports/{reportId} (Reporte por ID)
+```json
+{
+  "reportId": "R001",
+  "message": "This is a placeholder for a specific report by ID."
+}
+```
+
+### Ejemplo de Respuesta para GET /api/v1/reports/student/{studentId} (Reportes por ID de estudiante)
+```json
+{
+  "studentId": "S001",
+  "message": "This is a placeholder for reports filtered by student ID."
+}
+```
+
+### Ejemplo de Respuesta para GET /api/v1/reports/course/{courseId} (Reportes por ID de curso)
+```json
+{
+  "courseId": "C001",
+  "message": "This is a placeholder for reports filtered by course ID."
+}
+```
 
 ### ReportAverageGradeResponse (GET /api/v1/reports/student/{studentId}/average-grade)
 ```json
