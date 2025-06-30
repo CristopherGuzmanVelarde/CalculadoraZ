@@ -79,3 +79,76 @@ src/main/java/pe/edu/vallegrande/vg_ms_grade_management/
   "deleted": false
 }
 ```
+
+### Ejemplo de Respuesta para GET /api/grades (Lista de Calificaciones)
+```json
+[
+  {
+    "id": "654321",
+    "studentId": "S001",
+    "courseId": "C001",
+    "score": 90.0,
+    "deleted": false
+  },
+  {
+    "id": "654322",
+    "studentId": "S002",
+    "courseId": "C002",
+    "score": 85.5,
+    "deleted": false
+  }
+]
+```
+
+### Ejemplo de Respuesta para GET /api/grades/{id} (Calificación Única)
+```json
+{
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "score": 90.0,
+  "deleted": false
+}
+```
+
+### Ejemplo de Respuesta para DELETE /api/grades/{id} (Eliminación Lógica)
+```json
+{
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "score": 90.0,
+  "deleted": true
+}
+```
+
+### Ejemplo de Respuesta para PUT /api/grades/{id}/restore (Restauración)
+```json
+{
+  "id": "654321",
+  "studentId": "S001",
+  "courseId": "C001",
+  "score": 90.0,
+  "deleted": false
+}
+```
+
+### Ejemplo de Respuesta para GET /api/grades/inactive (Calificaciones Inactivas)
+```json
+[
+  {
+    "id": "654323",
+    "studentId": "S003",
+    "courseId": "C003",
+    "score": 70.0,
+    "deleted": true
+  },
+  {
+    "id": "654324",
+    "studentId": "S004",
+    "courseId": "C004",
+    "score": 65.0,
+    "deleted": true
+  }
+]
+```
